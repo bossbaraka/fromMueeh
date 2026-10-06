@@ -138,6 +138,8 @@
   .think-tile {
     @apply relative flex w-full cursor-pointer flex-col gap-1.5 rounded-2xl border border-line bg-white/70 p-4 text-start
       transition-all duration-200 ease-calm hover:-translate-y-0.5 hover:border-gold/60 hover:shadow-card;
+    /* سياق تكديس محلي: البطاقة المفتوحة تبقى فوق جاراتها ولا تتداخل معها */
+    isolation: isolate;
   }
 
   .think-tile[data-state="answered"] {
@@ -146,6 +148,12 @@
 
   .think-tile[data-state="open"] {
     @apply border-gold-deep bg-white shadow-gold;
+  }
+
+  /* البطاقة المفتوحة لا ترتفع عند التحويم — الرفع يُربك موضع اللوحة المفتوحة */
+  .think-tile[data-state="open"]:hover,
+  .think-tile-open:hover {
+    transform: none;
   }
 
   /* ---------------- Buttons ---------------- */

@@ -27,8 +27,13 @@ import { STEP_BODIES, STEP_META } from "./steps";
 import { SuccessScreen } from "./SuccessScreen";
 import { Turnstile, turnstileSiteKey } from "./Turnstile";
 import { ArrowLeft, ArrowRight, CheckIcon } from "@/components/ui/Primitives";
-import { APPLY_FACTS, APPLY_RAIL, TALENT_STAGES } from "@/lib/content";
+import { APPLY_FACTS, APPLY_RAIL, SUBMIT_ERROR_COPY, TALENT_STAGES } from "@/lib/content";
 import { Mark } from "@/components/brand/Logo";
+import {
+  locateField,
+  revealField,
+  type FieldLocation,
+} from "@/lib/form-navigation";
 import Link from "next/link";
 
 const DRAFT_KEY = "mureeh:draft:v1";
@@ -38,13 +43,24 @@ type Phase = "form" | "success";
 
 type ApiError = { ok: false; code: string; message: string; fieldErrors?: Record<string, string> };
 
+/** مشكلة واحدة كما نعرضها للمستخدم: أين هي، ولماذا فشلت */
+type FieldIssue = { field: string; message: string; location: FieldLocation | null };
+
+/** بطاقة الخطأ: السبب + مكان السؤال + ما يحتاج تعديلًا بعده */
+type SubmitError = {
+  message: string;
+  reason?: string;
+  location?: FieldLocation | null;
+  others: FieldIssue[];
+};
+
 export function ApplyForm() {
   const reduce = useReducedMotion();
   const [phase, setPhase] = React.useState<Phase>("form");
   const [stepIndex, setStepIndex] = React.useState(0);
   const [maxVisited, setMaxVisited] = React.useState(0);
   const [direction, setDirection] = React.useState<1 | -1>(1);
-  const [formError, setFormError] = React.useState<string | null>(null);
+  const [submitError, setSubmitError] = React.useState<SubmitError | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [submissionId, setSubmissionId] = React.useState<string | null>(null);
   const [restored, setRestored] = React.useState(false);
@@ -54,6 +70,7 @@ export function ApplyForm() {
 
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const topRef = React.useRef<HTMLDivElement>(null);
+  const errorRef = React.useRef<HTMLDivElement>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(fullSchema) as unknown as Resolver<FormValues>,
@@ -63,6 +80,15 @@ export function ApplyForm() {
 
   const stepId: StepId = STEP_IDS[stepIndex];
   const meta = STEP_META[stepId];
+
+  /* معاينة شاشة النجاح أثناء التطوير: /apply?preview=success
+     (معطّل في الإنتاج — لا نريد اختصارًا لتجربة الإرسال الحقيقية) */
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (new URLSearchParams(window.location.search).get("preview") !== "success") return;
+    setSubmissionId("PREVIEW-000001");
+    setPhase("success");
+  }, []);
 
   /* ---------------------- استعادة المسودة المحلية --------------------- */
   React.useEffect(() => {
@@ -110,27 +136,67 @@ export function ApplyForm() {
   }, [stepIndex, phase, meta, reduce]);
 
   /* ----------------------------- التنقل ------------------------------ */
-  const goTo = (index: number) => {
-    setFormError(null);
+  const goTo = (index: number, { keepError = false }: { keepError?: boolean } = {}) => {
+    if (!keepError) setSubmitError(null);
     setDirection(index > stepIndex ? 1 : -1);
     setStepIndex(index);
     setMaxVisited((m) => Math.max(m, index));
   };
 
+  /**
+   * عرض فشل واضح: الرسالة + السبب + مكان السؤال، ثم (اختياريًا) أخذ المستخدم إليه.
+   * لا نكتفي بـ «حاول مرة أخرى» — المستخدم يعرف أين المشكلة وكيف يصلحها.
+   */
+  const showFailure = (
+    message: string,
+    issues: FieldIssue[],
+    { reveal = true }: { reveal?: boolean } = {},
+  ) => {
+    const target = issues.find((issue) => issue.location) ?? null;
+
+    setSubmitError({
+      message,
+      reason: target?.message,
+      location: target?.location ?? null,
+      others: issues.filter((issue) => issue !== target).slice(0, 3),
+    });
+
+    if (target?.location) {
+      goTo(target.location.stepIndex, { keepError: true });
+      if (reveal) {
+        // نترك ثانية تقريبًا لقراءة البطاقة، ثم نأخذه إلى السؤال
+        revealField(target.field, { smooth: !reduce, delay: 900 });
+      }
+    } else {
+      window.requestAnimationFrame(() =>
+        errorRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }),
+      );
+    }
+  };
+
   const goNext = async () => {
-    setFormError(null);
+    setSubmitError(null);
     // نتحقق فقط من حقول الفصل الحالي — لا نحجب المستخدم بحقول لم يصلها بعد
     const fields = fieldsForStep(stepId);
     const valid = await form.trigger(fields as FieldName[], { shouldFocus: true });
     if (!valid) {
-      setFormError("راجع الحقول المعلّمة قبل المتابعة.");
+      // shouldFocus يكفي داخل نفس الفصل — نعرض السبب والمكان دون قفزة إضافية
+      const current = form.formState.errors as Record<string, { message?: string } | undefined>;
+      const issues: FieldIssue[] = fields
+        .filter((field) => Boolean(current[field]?.message))
+        .map((field) => ({
+          field,
+          message: String(current[field]?.message ?? ""),
+          location: locateField(field),
+        }));
+      showFailure(SUBMIT_ERROR_COPY.stepBlocked, issues, { reveal: false });
       return;
     }
     goTo(Math.min(stepIndex + 1, TOTAL - 1));
   };
 
   const goBack = () => {
-    setFormError(null);
+    setSubmitError(null);
     if (stepIndex === 0) {
       window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
       return;
@@ -140,7 +206,7 @@ export function ApplyForm() {
 
   const onValid = async (values: FormValues) => {
     setSubmitting(true);
-    setFormError(null);
+    setSubmitError(null);
     try {
       const res = await fetch("/api/talent", {
         method: "POST",
@@ -159,12 +225,20 @@ export function ApplyForm() {
 
       if (!res.ok || !("ok" in data) || data.ok === false) {
         const err = data as ApiError;
-        if (err.fieldErrors) {
-          for (const [key, message] of Object.entries(err.fieldErrors)) {
-            form.setError(key as FieldName, { type: "server", message });
-          }
+        const fieldErrors = err.fieldErrors ?? {};
+
+        // نحدّد الحقول كما يراها السيرفر، ثم نجمعها في بطاقة خطأ واحدة واضحة
+        for (const [key, message] of Object.entries(fieldErrors)) {
+          form.setError(key as FieldName, { type: "server", message });
         }
-        setFormError(err.message ?? "تعذّر إرسال الطلب. أعد المحاولة بعد قليل.");
+
+        const issues: FieldIssue[] = Object.entries(fieldErrors).map(([field, message]) => ({
+          field,
+          message,
+          location: locateField(field),
+        }));
+
+        showFailure(err.message || SUBMIT_ERROR_COPY.fallback, issues);
         return;
       }
 
@@ -176,19 +250,23 @@ export function ApplyForm() {
       setSubmissionId(data.submissionId);
       setPhase("success");
     } catch {
-      setFormError("تعذّر الوصول إلى الشبكة. تأكد من الاتصال ثم أعد المحاولة.");
+      showFailure(SUBMIT_ERROR_COPY.network, []);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const submit = form.handleSubmit(onValid, () => {
-    setFormError("هناك حقول ناقصة في فصول سابقة. سنأخذك إليها.");
-    // الانتقال إلى أول فصل فيه خطأ
-    const firstErrorField = Object.keys(form.formState.errors)[0];
-    if (!firstErrorField) return;
-    const idx = STEP_IDS.findIndex((id) => fieldsForStep(id).includes(firstErrorField));
-    if (idx >= 0) goTo(idx);
+  const submit = form.handleSubmit(onValid, (fieldErrors) => {
+    // حقول ناقصة في فصول سابقة: نذكر السبب، ونحدّد مكانها، ونأخذه إليها
+    const issues: FieldIssue[] = Object.entries(fieldErrors)
+      .map(([field, error]) => ({
+        field,
+        message: String((error as { message?: string } | undefined)?.message ?? ""),
+        location: locateField(field),
+      }))
+      .filter((issue) => issue.message.length > 0 || issue.location);
+
+    showFailure(SUBMIT_ERROR_COPY.incomplete, issues);
   });
 
   /* ---------------------------- شاشة النجاح -------------------------- */
@@ -306,12 +384,88 @@ export function ApplyForm() {
                 </AnimatePresence>
               </div>
 
-              {formError && (
+              {submitError && (
                 <div
+                  ref={errorRef}
                   role="alert"
-                  className="mt-5 rounded-2xl border border-red-300/70 bg-red-50/70 px-4 py-3 text-[14px] leading-7 text-red-800"
+                  aria-live="assertive"
+                  className="mt-5 overflow-hidden rounded-2xl border border-red-300/70 bg-red-50/80 shadow-card"
                 >
-                  {formError}
+                  <div className="flex items-start gap-3 p-4 sm:p-5">
+                    <span
+                      aria-hidden
+                      className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-red-600 text-[13px] font-bold text-white"
+                    >
+                      !
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-semibold text-red-900">
+                        {SUBMIT_ERROR_COPY.title}
+                      </p>
+                      <p className="mt-1 text-[14px] leading-8 text-red-800">
+                        {submitError.message}
+                      </p>
+
+                      {submitError.reason && (
+                        <p className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[13.5px] leading-7 text-red-900">
+                          <span className="font-semibold">{SUBMIT_ERROR_COPY.reason}: </span>
+                          {submitError.reason}
+                        </p>
+                      )}
+
+                      {submitError.location && (
+                        <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13.5px] text-red-900">
+                          <span className="font-semibold">{SUBMIT_ERROR_COPY.location}:</span>
+                          <span className="rounded-full border border-red-300/80 bg-white/70 px-2.5 py-0.5 font-medium">
+                            {submitError.location.chapter} — {submitError.location.fieldLabel}
+                          </span>
+                        </p>
+                      )}
+
+                      {submitError.others.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-[12.5px] font-semibold text-red-900/80">
+                            {SUBMIT_ERROR_COPY.alsoNeeds}:
+                          </p>
+                          <ul className="mt-1 space-y-1">
+                            {submitError.others.map((issue) => (
+                              <li
+                                key={issue.field}
+                                className="text-[13px] leading-7 text-red-800"
+                              >
+                                ·{" "}
+                                {issue.location
+                                  ? `${issue.location.chapter} — ${issue.location.fieldLabel}`
+                                  : issue.message}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                        {submitError.location && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const location = submitError.location;
+                              if (!location) return;
+                              goTo(location.stepIndex, { keepError: true });
+                              revealField(location.field, { smooth: !reduce });
+                            }}
+                            className="btn-ghost !min-h-0 !border-red-300 !bg-white/70 !px-3 !py-1.5 !text-[13px] !text-red-800 hover:!border-red-400"
+                          >
+                            {SUBMIT_ERROR_COPY.jump}
+                            <ArrowLeft className="h-4 w-4" />
+                          </button>
+                        )}
+                        <span className="text-[12.5px] leading-6 text-red-700/80">
+                          {SUBMIT_ERROR_COPY.dataSafe}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -326,6 +480,33 @@ export function ApplyForm() {
 
         {/* --------------------- شريط التنقل السفلي -------------------- */}
         <div className="sticky bottom-0 z-30 border-t border-line bg-ivory-200/90 backdrop-blur-md">
+          {/* شريط الخطأ اللاصق: يبقى ظاهرًا حتى بعد انتقالنا إلى مكان السؤال */}
+          {submitError?.location && (
+            <button
+              type="button"
+              onClick={() => {
+                const location = submitError.location;
+                if (!location) return;
+                goTo(location.stepIndex, { keepError: true });
+                revealField(location.field, { smooth: !reduce });
+              }}
+              className="mx-auto flex w-full max-w-[820px] items-center justify-center gap-2 px-5 pt-2.5 text-center text-[12.5px] leading-6 text-red-700 sm:px-8"
+            >
+              <span
+                aria-hidden
+                className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-red-600 text-[10px] font-bold text-white"
+              >
+                !
+              </span>
+              <span className="truncate">
+                {submitError.location.chapter} — {submitError.location.fieldLabel}
+              </span>
+              <span className="shrink-0 font-semibold underline decoration-red-300 underline-offset-2">
+                {SUBMIT_ERROR_COPY.jump}
+              </span>
+            </button>
+          )}
+
           <div className="form-shell mx-auto flex w-full max-w-[820px] items-center justify-between gap-3 px-5 py-3 sm:px-8">
             <button type="button" onClick={goBack} className="btn-ghost !min-h-[44px] !px-4 !text-[14px]">
               <ArrowRight className="h-4 w-4" />

@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { SUCCESS_COPY, TALENT_STAGES } from "@/lib/content";
+import { SUCCESS_COPY, TALENT_STAGES, visibleSocialLinks } from "@/lib/content";
 import { Mark } from "@/components/brand/Logo";
+import { SocialLinks } from "@/components/site/SocialLinks";
 import { ArrowLeft, CheckIcon } from "@/components/ui/Primitives";
 import Link from "next/link";
 import { shortId } from "@/lib/utils";
@@ -57,6 +58,11 @@ export function SuccessScreen({ submissionId }: { submissionId: string }) {
           {SUCCESS_COPY.line2}
         </p>
 
+        {/* شكر صريح — لا رسالة «Success» باردة */}
+        <p className="mx-auto mt-6 max-w-xl text-[15.5px] font-semibold leading-8 text-gold-soft">
+          {SUCCESS_COPY.thanks}
+        </p>
+
         {/* بطاقة الرقم والحالة */}
         <div className="mx-auto mt-9 grid max-w-xl gap-px overflow-hidden rounded-2xl border border-ivory-50/10 bg-ivory-50/10 sm:grid-cols-3">
           {[
@@ -97,6 +103,21 @@ export function SuccessScreen({ submissionId }: { submissionId: string }) {
             ))}
           </ol>
         </div>
+
+        {/* تابع صفحات مُريح — الفرص تُنشر هناك أولًا */}
+        {visibleSocialLinks.length > 0 && (
+          <div className="mx-auto mt-12 max-w-xl">
+            <div aria-hidden className="gold-rule mx-auto mb-7 max-w-[220px]" />
+            <p className="rail-eyebrow">{SUCCESS_COPY.followTitle}</p>
+            <p className="mx-auto mt-3 max-w-lg text-[14px] leading-8 text-ivory-100/70">
+              {SUCCESS_COPY.followBody}
+            </p>
+            <SocialLinks tone="rail" className="mt-5" />
+            <p className="mx-auto mt-4 max-w-md text-[12.5px] leading-7 text-ivory-100/45">
+              {SUCCESS_COPY.followNote}
+            </p>
+          </div>
+        )}
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link href="/" className="btn-gold">
