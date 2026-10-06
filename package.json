@@ -1,0 +1,35 @@
+{
+  "name": "mureeh-talent-network",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mureeh — Talent & Service Provider Acquisition System",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "typecheck": "tsc --noEmit",
+    "sheet:headers": "node scripts/print-headers.mjs",
+    "selftest": "node scripts/self-test.mjs",
+    "report": "node scripts/decision-report.mjs",
+    "sheets:connect": "node scripts/connect-sheets.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.1",
+    "framer-motion": "^11.15.0",
+    "googleapis": "^144.0.0",
+    "next": "^16.3.8",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.54.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}
