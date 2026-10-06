@@ -29,6 +29,7 @@ const config: Config = {
         // Deep navy / charcoal
         navy: {
           DEFAULT: "#0B1320",
+          900: "#070D17",
           800: "#101A2B",
           700: "#152238",
           600: "#1E3049",
@@ -61,6 +62,9 @@ const config: Config = {
         card: "0 1px 1px rgba(11,19,32,0.03), 0 20px 50px -34px rgba(11,19,32,0.28)",
         elev: "0 30px 80px -44px rgba(11,19,32,0.42)",
         gold: "0 0 0 1px rgba(212,175,55,0.35), 0 12px 30px -18px rgba(201,162,39,0.45)",
+        rail: "inset -1px 0 0 rgba(212,175,55,0.18), 30px 0 80px -50px rgba(7,13,23,0.55)",
+        "gold-ring": "0 0 0 1px rgba(212,175,55,0.45), 0 0 0 6px rgba(212,175,55,0.10)",
+        "navy-pill": "0 10px 22px -14px rgba(11,19,32,0.65)",
       },
       maxWidth: {
         form: "960px",

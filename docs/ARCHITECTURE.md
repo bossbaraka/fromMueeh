@@ -28,14 +28,19 @@ before step 1, step 7 (collaboration model), and step 11 (agreement checklist).
 ```
 Landing (/)
   └─ understands the model, the 5 stages, and the FAQ
-        └─ /apply → Intro screen (expectations, 15–20 min, draft saved locally)
-              └─ 01 Identity → 02 Craft → 03 Experience
-                    └─ 04 Thinking (3 sub-pages × 4 questions)
-                          └─ 05 Work (3 projects) → 06 AI → 07 Collaboration
-                                └─ 08 Availability → 09 Pricing → 10 Why
-                                      └─ 11 Agreement → Submit
-                                            └─ Success screen (brand experience + reference ID)
+        └─ /apply → split screen: navy brand rail (chapters, progress, proof)
+              └─ 01 Profile (identity + craft) → 02 Experience
+                    └─ 03 Thinking (pick & answer ≥4 of 12 questions)
+                          └─ 04 Work (1 required project + 2 opt-in)
+                                └─ 05 Match (AI + collaboration + availability + pricing)
+                                      └─ 06 Closing (why + agreements) → Submit
+                                            └─ Success screen (gold seal on navy + reference ID)
 ```
+
+v2 («Atelier», 2026-10) shortened the journey from 13 pages to 6 chapters **without
+touching the data contract**: the thinking chapter asks for a minimum of 4 answered
+questions out of the 12 (the applicant chooses which), and related field groups were
+merged into single coherent chapters. All 66 Sheet columns are still collected.
 
 Failure path from the team's side is equally defined: a submission that never matches a
 project stays in the sheet as a **record of capability** — the sheet is a talent map, not
@@ -48,7 +53,7 @@ an inbox.
 | Route | Purpose | Notes |
 | --- | --- | --- |
 | `/` | Positioning + transparency + FAQ | Server component, fully static-friendly |
-| `/apply` | The 11-step / 13-page application | `robots: noindex` |
+| `/apply` | The 6-chapter split-screen application (navy rail + ivory panel) | `robots: noindex` |
 | `/team` | Internal review view of the talent database | Token-gated in production, `noindex` |
 | `/api/talent` | Submission endpoint (POST only) | Node runtime, server-only credentials |
 | `/api/talent/setup` | Creates tab + header row | `x-admin-token` required |
@@ -61,10 +66,9 @@ an inbox.
 The form is defined once in `src/lib/schema.ts`:
 
 ```ts
-stepSchemas = { identity, craft, experience, "thinking-a", "thinking-b", "thinking-c",
-                work, ai, collaboration, availability, pricing, why, agreement }
+stepSchemas = { profile, experience, thinking, work, match, closing }   // 6 chapters
 STEP_IDS        // ordered list used for navigation & progress
-fieldsForStep() // which fields a given page validates on «متابعة»
+fieldsForStep() // which fields a given chapter validates on «متابعة»
 fullSchema      // the single Zod object used by both client and server
 TalentValues    // the explicit data contract (compiled-time checked against Zod)
 ```
@@ -78,18 +82,22 @@ Rules that the implementation follows:
   asserts `z.infer<typeof fullSchema>` conforms to `TalentValues`.
 * **Cross-field rules** live in `partialProjectErrors()` + `superRefine`:
   projects 2/3 must be either complete or empty; `primary_specialty` must be one of the
-  selected `services`.
-* **"Continue" only validates the current page** (`trigger(fieldsForStep(id))`), so the
-  user is never blocked by a page they haven't reached.
-* **Submitting from any page jumps back** to the first page that has an error.
+  selected `services`; **the thinking quota** (≥ `THINKING_MIN_ANSWERS` answered of the 12)
+  lands its error on the first unanswered thinking column so the UI can open that tile.
+* **"Continue" only validates the current chapter** (`trigger(fieldsForStep(id))`), so the
+  user is never blocked by a chapter they haven't reached.
+* **Submitting from any chapter jumps back** to the first chapter that has an error.
 
-### Why step 04 is split into three pages
+### Why thinking is a picker (4 of 12), not three pages
 
-Twelve long-form questions on one screen is a wall of text. They are grouped by theme —
-*reading the problem* → *decisions, quality, tools* → *value & responsibility* — with a
-calm progress indication (`1 من 3`). Content and minimum lengths live in
-`src/lib/content.ts` (`THINKING_QUESTIONS`) and the Sheet columns are derived from the
-same array.
+Twelve long-form questions are the single biggest reason the old form felt endless. The
+v2 design keeps all 12 questions — and all 12 Sheet columns — but presents them as a
+**picker**: three themed groups of tiles; the applicant opens the questions that resemble
+their experience, answers at least `THINKING_MIN_ANSWERS` (4), and leaves the rest empty.
+Each answered question still enforces its own minimum length (`optionalLongAnswer`), so
+the database never holds half-answers, while the form stays around ~10 minutes.
+Unanswered questions are explicitly neutral: the decision-support engine computes
+coverage over answered questions only and reports `thinking n/12` in its output.
 
 ---
 
@@ -150,12 +158,16 @@ Thinking(13) · Portfolio(15) · Agreement(3) · Team(3)
 | Phone | «أدخل رقم تواصل صحيحًا (مع رمز الدولة).» |
 | URLs (optional but must be valid) | «أدخل رابطًا صحيحًا يبدأ بـ https://» |
 | Long answers | «خلّينا نفهم تفكيرك أكثر — اكتب على الأقل 120 حرفًا.» |
+| Thinking per-question (only if answered) | «إن أردت إجابة هذا السؤال: اكتب 120 حرفًا على الأقل — أو اتركه واختر سؤالًا غيره.» |
+| Thinking quota (≥4 of 12) | «أجب على 4 أسئلة على الأقل من أسئلة التفكير — اختر ما يشبهك منها واترك الباقي.» |
 | Multi-select | «اختر خدمة واحدة على الأقل تقدّمها فعلًا.» |
 | Agreement | «لازم تأكيد أنك تفهم أن الطلب لا يعني التوظيف.» |
 | Partial project | «المشروع الثاني: إمّا تكمل كل حقوله أو تتركه فارغًا بالكامل.» |
 
 Minimum lengths are intentionally enforced **only on long-form answers** (50–120 chars),
-so the field is never empty-but-technically-valid.
+so the field is never empty-but-technically-valid. Thinking questions are the exception:
+an empty answer means «chose not to answer» and is valid; a non-empty one must respect
+its minimum — and the quota rule guarantees at least 4 non-empty answers overall.
 
 ### Error states
 
@@ -173,12 +185,16 @@ so the field is never empty-but-technically-valid.
 
 ## 8. Mobile UX
 
-* Single column, full-width fields, 48px minimum control height (chips ≈44px on mobile).
+* **Desktop (≥lg): split screen.** A sticky navy brand rail (chapters stepper, progress,
+  platform proof, transparency note) beside the ivory form column; the rail's stepper
+  navigates back to any reached chapter.
+* **Mobile: sticky navy top bar** with chapter title + percentage + thin gold progress
+  line; single column, full-width fields, 48px minimum control height (chips ≈44px).
 * **Sticky bottom navigation** (رجوع / متابعة) always reachable; the primary action is on
   the start side of the RTL layout.
-* Sticky compact progress header: step number, step name, percentage, thin gold bar.
-* Long pages (thinking questions, projects) are split into thematic pages rather than
-  endless scroll; projects 2 and 3 are opt-in with a dashed "+ أضف مشروعًا آخر".
+* Thinking questions render as **tiles** (three themed groups); opening a tile expands a
+  single editor inline — one open editor at a time keeps the chapter scannable.
+  Projects 2 and 3 remain opt-in with a dashed "+ أضف مشروعًا آخر".
 * `Enter` in a text input means **متابعة**, never an accidental submit.
 
 ---

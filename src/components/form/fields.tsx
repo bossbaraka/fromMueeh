@@ -188,29 +188,37 @@ export function TextArea({
         className="field-textarea"
         {...form.register(name)}
       />
-      <div
-        id={`${id}-counter`}
-        className="mt-2 flex items-center justify-between gap-3 text-[12px] text-ink-faint"
-      >
-        <span className="inline-flex items-center gap-1.5">
-          {minLength ? (
-            <>
-              <span
-                aria-hidden
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full transition-colors",
-                  reached ? "bg-emerald-500" : "bg-gold/70",
-                )}
-              />
-              {reached ? "شكرًا — واضح." : `اكتب على الأقل ${minLength} حرفًا`}
-            </>
-          ) : (
-            <span aria-hidden />
-          )}
-        </span>
-        <span className="ltr tabular-nums">
-          {count}/{maxLength}
-        </span>
+      <div id={`${id}-counter`} className="mt-2 space-y-1.5">
+        {minLength ? (
+          <div
+            aria-hidden
+            className="count-line"
+            title={`${count}/${minLength} حرفًا كحدّ أدنى`}
+          >
+            <span style={{ width: `${Math.min(100, Math.round((count / minLength) * 100))}%` }} />
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-3 text-[12px] text-ink-faint">
+          <span className="inline-flex items-center gap-1.5">
+            {minLength ? (
+              <>
+                <span
+                  aria-hidden
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full transition-colors",
+                    reached ? "bg-emerald-500" : "bg-gold/70",
+                  )}
+                />
+                {reached ? "شكرًا — واضح." : `اكتب على الأقل ${minLength} حرفًا`}
+              </>
+            ) : (
+              <span aria-hidden />
+            )}
+          </span>
+          <span className="ltr tabular-nums">
+            {count}/{maxLength}
+          </span>
+        </div>
       </div>
     </FieldShell>
   );
@@ -338,6 +346,174 @@ export function RadioCards({
                         <span className="text-[13px] leading-6 text-ink-muted">{o.desc}</span>
                       )}
                     </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      />
+    </FieldShell>
+  );
+}
+
+/* --------------------- Segmented pills (سريع ومكثّف) ------------------ */
+
+export function Segmented({
+  form,
+  name,
+  label,
+  hint,
+  options,
+  required = true,
+  index,
+  className,
+}: {
+  form: Form;
+  name: FieldName;
+  label: string;
+  hint?: string;
+  options: readonly { value: string; ar?: string }[];
+  required?: boolean;
+  index?: string;
+  className?: string;
+}) {
+  const error = form.formState.errors[name] as FieldError | undefined;
+  const id = `f-${name}`;
+
+  return (
+    <FieldShell
+      id={id}
+      label={label}
+      hint={hint}
+      error={error}
+      required={required}
+      labelAs="div"
+      index={index}
+      className={className}
+    >
+      <Controller
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <div
+            role="radiogroup"
+            aria-labelledby={`${id}-legend`}
+            className="flex flex-wrap gap-2"
+          >
+            <span id={`${id}-legend`} className="sr-only">
+              {label}
+            </span>
+            {options.map((o) => {
+              const checked = field.value === o.value;
+              return (
+                <label key={o.value} className="relative inline-flex">
+                  <input
+                    type="radio"
+                    name={field.name}
+                    value={o.value}
+                    checked={checked}
+                    onChange={() => field.onChange(o.value)}
+                    onBlur={field.onBlur}
+                    className="peer sr-only"
+                  />
+                  <span className="seg">
+                    {checked && <CheckIcon className="h-3.5 w-3.5 text-gold" />}
+                    <span>{o.ar ?? o.value}</span>
+                    {o.ar && o.ar !== o.value && (
+                      <span className="ltr text-[11px] opacity-60">{o.value}</span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      />
+    </FieldShell>
+  );
+}
+
+/* ------------------- Radio with description (بطاقات وصفيّة) ------------------- */
+
+export function RadioDesc({
+  form,
+  name,
+  label,
+  hint,
+  options,
+  columns = 2,
+  required = true,
+  index,
+}: {
+  form: Form;
+  name: FieldName;
+  label: string;
+  hint?: string;
+  options: readonly { value: string; ar?: string; desc?: string }[];
+  columns?: 1 | 2 | 3;
+  required?: boolean;
+  index?: string;
+}) {
+  const error = form.formState.errors[name] as FieldError | undefined;
+  const id = `f-${name}`;
+  const colClass =
+    columns === 1 ? "grid-cols-1" : columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2";
+
+  return (
+    <FieldShell
+      id={id}
+      label={label}
+      hint={hint}
+      error={error}
+      required={required}
+      labelAs="div"
+      index={index}
+    >
+      <Controller
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <div
+            role="radiogroup"
+            aria-labelledby={`${id}-legend`}
+            className={cn("grid grid-cols-1 gap-2.5", colClass)}
+          >
+            <span id={`${id}-legend`} className="sr-only">
+              {label}
+            </span>
+            {options.map((o) => {
+              const checked = field.value === o.value;
+              return (
+                <label key={o.value} className="relative block">
+                  <input
+                    type="radio"
+                    name={field.name}
+                    value={o.value}
+                    checked={checked}
+                    onChange={() => field.onChange(o.value)}
+                    onBlur={field.onBlur}
+                    className="peer sr-only"
+                  />
+                  <span className="seg-desc">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[14px] font-semibold text-navy">{o.ar ?? o.value}</span>
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "grid h-4 w-4 shrink-0 place-items-center rounded-full border transition-colors",
+                          checked ? "border-gold-deep bg-gold text-navy" : "border-ivory-500 bg-white",
+                        )}
+                      >
+                        {checked && <CheckIcon className="h-2.5 w-2.5" />}
+                      </span>
+                    </span>
+                    {o.desc && (
+                      <span className="text-[12.5px] leading-6 text-ink-muted">{o.desc}</span>
+                    )}
+                    {o.ar && o.ar !== o.value && (
+                      <span className="ltr text-[11px] text-ink-faint">{o.value}</span>
+                    )}
                   </span>
                 </label>
               );

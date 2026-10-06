@@ -1,17 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 
 /**
  * الخط: IBM Plex Sans Arabic — عربي أولًا مع دعم لاتيني متناسق.
- * يُستضاف محليًا عبر next/font (لا طلبات خارجية عند المستخدم).
+ * مُضاف عبر حزمة @fontsource (ملفات woff2 داخل الـ bundle):
+ * استضافة محلية كاملة، بلا أي طلب خارجي عند المستخدم، وبلا اعتماد على الشبكة وقت البناء.
  */
-const arabic = IBM_Plex_Sans_Arabic({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-arabic",
-});
+/* ملفات الوزن الكاملة تحمل unicode-range لكل subset (عربي/لاتيني/…) —
+   فلا يتحمّل المتصفح إلا الوجوه المستخدمة فعليًا */
+import "@fontsource/ibm-plex-sans-arabic/300.css";
+import "@fontsource/ibm-plex-sans-arabic/400.css";
+import "@fontsource/ibm-plex-sans-arabic/500.css";
+import "@fontsource/ibm-plex-sans-arabic/600.css";
+import "@fontsource/ibm-plex-sans-arabic/700.css";
 
 export const metadata: Metadata = {
   title: {
@@ -49,7 +50,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" data-scroll-behavior="smooth" className={arabic.variable}>
+    <html lang="ar" dir="rtl" data-scroll-behavior="smooth">
       <body>
         <a
           href="#main"

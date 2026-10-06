@@ -72,8 +72,10 @@ export type DecisionSupport = {
     score: number; // 0..100 (اكتمال الوصف، لا جودة الشخص)
     portfolio_projects: number;
     links: number;
-    avg_answer_ratio: number; // متوسط طول الإجابة ÷ الحد الأدنى المطلوب
+    avg_answer_ratio: number; // متوسط طول الإجابات المُجابة ÷ الحد الأدنى المطلوب
     thin_answers: string[]; // أسئلة إجاباتها قريبة من الحد الأدنى
+    answered_questions: number; // عدد أسئلة التفكير المُجابة (الحصة 4 من 12)
+    total_questions: number; // 12
   };
   thinking_themes: ThinkingTheme[];
   signals: Signal[];
@@ -262,13 +264,19 @@ export function buildDecisionSupport(values: TalentValues, now = new Date()): De
         : "balanced";
 
   /* -------- الاكتمال -------- */
+  // أسئلة التفكير اختيارية منذ v2 (حصة 4 من 12) — لذا يُحسب المتوسط على المُجاب فقط،
+  // ويُذكر عدد المُجاب صراحةً حتى لا تُقرأ التغطية المختارة كأنها ضعف في الملف.
   const ratios = THINKING_QUESTIONS.map((q) => {
     const text = String((values as unknown as Record<string, string>)[q.column] ?? "");
     return { title: q.title, ratio: text.trim().length / q.minLength, length: text.trim().length };
   });
+  const answeredRatios = ratios.filter((r) => r.length > 0);
+  const answeredCount = answeredRatios.length;
 
-  const avgAnswerRatio = ratios.reduce((sum, r) => sum + r.ratio, 0) / ratios.length;
-  const thinAnswers = ratios.filter((r) => r.ratio < 1.25).map((r) => r.title);
+  const avgAnswerRatio = answeredCount
+    ? answeredRatios.reduce((sum, r) => sum + r.ratio, 0) / answeredCount
+    : 0;
+  const thinAnswers = answeredRatios.filter((r) => r.ratio < 1.25).map((r) => r.title);
 
   const projects = [1, 2, 3].filter(
     (n) => String((values as unknown as Record<string, string>)[`project_${n}`] ?? "").trim().length > 0,
@@ -284,8 +292,10 @@ export function buildDecisionSupport(values: TalentValues, now = new Date()): De
     hasAnyDigit(String((values as unknown as Record<string, string>)[`project_${n}_result`] ?? "")),
   );
 
+  // 20 نقطة لتغطية أسئلة التفكير (من 6 إجابات فأكثر) + 35 لعمق الإجابات المُجابة
   const completenessScore = Math.round(
-    Math.min(1, avgAnswerRatio / 2) * 55 +
+    Math.min(1, answeredCount / 6) * 20 +
+      Math.min(1, avgAnswerRatio / 2) * 35 +
       Math.min(1, projects.length / 2) * 20 +
       Math.min(1, links / 2) * 10 +
       (hasNumbersInResults ? 10 : 0) +
@@ -331,6 +341,13 @@ export function buildDecisionSupport(values: TalentValues, now = new Date()): De
       type: "watch",
       label: "إجابات قريبة من الحد الأدنى",
       detail: `${thinAnswers.length} أسئلة بإجابات قصيرة نسبيًا (${thinAnswers.slice(0, 3).join(" · ")}…) — تحتاج أسئلة متابعة في التواصل.`,
+    });
+  }
+  if (answeredCount < THINKING_QUESTIONS.length) {
+    signals.push({
+      type: answeredCount >= 6 ? "watch" : "flag",
+      label: "تغطية تفكير مختارة",
+      detail: `أجاب على ${answeredCount} من ${THINKING_QUESTIONS.length} سؤالًا (النموذج يسمح باختيار 4 على الأقل) — الثيمات أدناه مبنية على المُجاب فقط، ويمكن تعميقها في التواصل الأول.`,
     });
   }
   if (!hasNumbersInResults) {
@@ -465,6 +482,8 @@ export function buildDecisionSupport(values: TalentValues, now = new Date()): De
       links,
       avg_answer_ratio: Number(avgAnswerRatio.toFixed(2)),
       thin_answers: thinAnswers,
+      answered_questions: answeredCount,
+      total_questions: THINKING_QUESTIONS.length,
     },
     thinking_themes,
     signals,
@@ -522,7 +541,9 @@ export async function enrichWithLlm(
                 profile: base.profile,
                 thinking_themes: base.thinking_themes.map((t) => t.label),
                 signals: base.signals,
-                answers: allAnswerTexts(values).map((a) => ({ q: a.title, a: a.text })),
+                answers: allAnswerTexts(values)
+                  .filter((a) => a.text.trim().length > 0)
+                  .map((a) => ({ q: a.title, a: a.text })),
               }),
             },
           ],
@@ -552,7 +573,7 @@ export function toSheetCell(d: DecisionSupport): string {
   return [
     `themes: ${themes}`,
     `signals: +${strengths} / !${watch}`,
-    `completeness: ${d.completeness.score}%`,
+    `completeness: ${d.completeness.score}% (thinking ${d.completeness.answered_questions}/${d.completeness.total_questions})`,
     `fit: ${d.fit.project_types.slice(0, 3).join(" · ")}`,
     `review: human`,
   ].join(" | ");
