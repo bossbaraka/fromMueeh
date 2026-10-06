@@ -37,6 +37,7 @@ import {
 import Link from "next/link";
 
 const DRAFT_KEY = "mureeh:draft:v1";
+const FORM_ID = "mureeh-apply-form";
 const TOTAL = STEP_IDS.length;
 
 type Phase = "form" | "success";
@@ -337,6 +338,7 @@ export function ApplyForm() {
             </p>
 
             <form
+              id={FORM_ID}
               onSubmit={submit}
               noValidate
               onKeyDown={(e) => {
@@ -518,7 +520,7 @@ export function ApplyForm() {
             </p>
 
             {isLast ? (
-              <button type="submit" disabled={submitting} className="btn-gold !min-h-[46px]">
+              <button type="submit" form={FORM_ID} disabled={submitting} className="btn-gold !min-h-[46px]">
                 {submitting ? "جارٍ الإرسال…" : "إرسال الطلب"}
                 <ArrowLeft className="h-4 w-4" />
               </button>
