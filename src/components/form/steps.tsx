@@ -20,6 +20,7 @@ import {
   TextInput,
 } from "./fields";
 import { cn } from "@/lib/utils";
+import { REVEAL_FIELD_EVENT } from "@/lib/form-navigation";
 import {
   AGREEMENT_ITEMS,
   AI_EXPERIENCE_LEVELS,
@@ -351,6 +352,19 @@ function ThinkingStep({ form }: StepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstErrorColumn]);
 
+  /* رسالة فشل الإرسال: نفتح سؤال التفكير المعني حتى لو كان المستخدم في فصل آخر */
+  React.useEffect(() => {
+    const onReveal = (event: Event) => {
+      const field = (event as CustomEvent<{ field?: string }>).detail?.field;
+      if (!field) return;
+      const isThinking = THINKING_QUESTIONS.some((q) => q.column === field);
+      if (!isThinking) return;
+      setOpenColumn(field);
+    };
+    window.addEventListener(REVEAL_FIELD_EVENT, onReveal as EventListener);
+    return () => window.removeEventListener(REVEAL_FIELD_EVENT, onReveal as EventListener);
+  }, []);
+
   const isQuotaError = firstErrorColumn
     ? errors[firstErrorColumn]?.message === quotaMessage
     : false;
@@ -390,106 +404,124 @@ function ThinkingStep({ form }: StepProps) {
         </div>
       )}
 
-      {THINKING_PAGES.map((group) => (
-        <SectionBlock key={group.id} label={group.title}>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {group.questions.map((q, i) => {
-              const column = q.column as K;
-              const text = String(values[column] ?? "");
-              const isAnswered = text.trim().length > 0;
-              const isOpen = openColumn === q.column;
-              const globalIndex =
-                THINKING_QUESTIONS.findIndex((x) => x.column === q.column) + 1;
-              const error = errors[q.column]?.message;
+      {THINKING_PAGES.map((group) => {
+        /* البطاقة المفتوحة تأخذ عرض السطر كاملًا.
+           وحتى لا يبقى مكانها الأصلي فارغًا (فراغ بصري في الشبكة)،
+           نمدّد شريكها في نفس الصف إن كانت في خانة زوجية. */
+        const openIndexInGroup = group.questions.findIndex((q) => q.column === openColumn);
 
-              return (
-                <div
-                  key={q.id}
-                  id={`think-tile-${q.column}`}
-                  className={cn("scroll-mt-header", isOpen && "sm:col-span-2")}
-                >
-                  <motion.div layout={!reduce} className="h-full">
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      onClick={() => setOpenColumn(isOpen ? null : q.column)}
-                      data-state={isOpen ? "open" : isAnswered ? "answered" : "idle"}
-                      className="think-tile h-full"
-                    >
-                      <span className="flex w-full items-start justify-between gap-3">
-                        <span className="flex min-w-0 items-start gap-2.5">
+        return (
+          <SectionBlock key={group.id} label={group.title}>
+            {/* items-start: لا تتمدد البطاقات مع ارتفاع الصف — مصدر التداخل القديم */}
+            <div className="grid items-start gap-2.5 sm:grid-cols-2">
+              {group.questions.map((q, i) => {
+                const column = q.column as K;
+                const text = String(values[column] ?? "");
+                const isAnswered = text.trim().length > 0;
+                const isOpen = openColumn === q.column;
+                const globalIndex =
+                  THINKING_QUESTIONS.findIndex((x) => x.column === q.column) + 1;
+                const error = errors[q.column]?.message;
+                const partnerOfOpen =
+                  openIndexInGroup >= 0 &&
+                  openIndexInGroup % 2 === 1 &&
+                  i === openIndexInGroup - 1;
+
+                return (
+                  <div
+                    key={q.id}
+                    id={`think-tile-${q.column}`}
+                    className={cn(
+                      "scroll-mt-header relative",
+                      isOpen ? "z-10 sm:col-span-2" : "z-0",
+                      partnerOfOpen && "sm:col-span-2",
+                    )}
+                  >
+                    {/* لا حركة layout هنا: CSS Grid يعيد الترتيب فورًا بلا إسقاط
+                        (transform) فوق البطاقات المجاورة — وهو سبب التداخل السابق */}
+                    <div>
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        onClick={() => setOpenColumn(isOpen ? null : q.column)}
+                        data-state={isOpen ? "open" : isAnswered ? "answered" : "idle"}
+                        className={cn("think-tile", isOpen && "think-tile-open")}
+                      >
+                        <span className="flex w-full items-start justify-between gap-3">
+                          <span className="flex min-w-0 items-start gap-2.5">
+                            <span
+                              className={cn(
+                                "ltr mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums",
+                                isAnswered
+                                  ? "bg-gold-deep text-white"
+                                  : "bg-ivory-300 text-ink-muted",
+                              )}
+                            >
+                              {isAnswered ? <CheckIcon className="h-3 w-3" /> : String(globalIndex).padStart(2, "0")}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-[14px] font-semibold leading-6 text-navy">
+                                {q.title}
+                              </span>
+                              {!isOpen && (
+                                <span className="clamp-2 mt-1 block text-[12.5px] leading-6 text-ink-muted">
+                                  {q.prompt}
+                                </span>
+                              )}
+                            </span>
+                          </span>
                           <span
+                            aria-hidden
                             className={cn(
-                              "ltr mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold tabular-nums",
-                              isAnswered
-                                ? "bg-gold-deep text-white"
-                                : "bg-ivory-300 text-ink-muted",
+                              "mt-1 shrink-0 text-[13px] text-ink-faint transition-transform duration-200",
+                              isOpen && "rotate-45 text-gold-deep",
                             )}
                           >
-                            {isAnswered ? <CheckIcon className="h-3 w-3" /> : String(globalIndex).padStart(2, "0")}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[14px] font-semibold leading-6 text-navy">
-                              {q.title}
-                            </span>
-                            {!isOpen && (
-                              <span className="clamp-2 mt-1 block text-[12.5px] leading-6 text-ink-muted">
-                                {q.prompt}
-                              </span>
-                            )}
+                            {isOpen ? "+" : isAnswered ? "✓" : "+"}
                           </span>
                         </span>
-                        <span
-                          aria-hidden
-                          className={cn(
-                            "mt-1 shrink-0 text-[13px] text-ink-faint transition-transform duration-200",
-                            isOpen && "rotate-45 text-gold-deep",
-                          )}
-                        >
-                          {isOpen ? "+" : isAnswered ? "✓" : "+"}
-                        </span>
-                      </span>
-                    </button>
+                      </button>
 
-                    <AnimatePresence initial={false}>
-                      {isOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: reduce ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-                          className="overflow-hidden"
-                        >
-                          <div className="rounded-b-2xl border border-t-0 border-gold-deep/60 bg-white/80 p-4 sm:p-5">
-                            <p className="mb-4 text-[14px] leading-8 text-navy">{q.prompt}</p>
-                            <TextArea
-                              form={form}
-                              name={column}
-                              label={q.title}
-                              hint={q.hint}
-                              minLength={q.minLength}
-                              rows={5}
-                            />
-                            <div className="mt-1 flex justify-end">
-                              <button
-                                type="button"
-                                className="btn-quiet !min-h-0 !px-3 !py-1.5 !text-[13px]"
-                                onClick={() => setOpenColumn(null)}
-                              >
-                                إغلاق السؤال
-                              </button>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: reduce ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+                            className="overflow-hidden"
+                          >
+                            <div className="rounded-b-2xl border border-t-0 border-gold-deep/60 bg-white/80 p-4 sm:p-5">
+                              <p className="mb-4 text-[14px] leading-8 text-navy">{q.prompt}</p>
+                              <TextArea
+                                form={form}
+                                name={column}
+                                label={q.title}
+                                hint={q.hint}
+                                minLength={q.minLength}
+                                rows={5}
+                              />
+                              <div className="mt-1 flex justify-end">
+                                <button
+                                  type="button"
+                                  className="btn-quiet !min-h-0 !px-3 !py-1.5 !text-[13px]"
+                                  onClick={() => setOpenColumn(null)}
+                                >
+                                  إغلاق السؤال
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                </div>
-              );
-            })}
-          </div>
-        </SectionBlock>
-      ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionBlock>
+        );
+      })}
 
       <p className="text-[12.5px] leading-7 text-ink-faint">
         لا إجابة صحيحة واحدة هنا — نقرأ طريقة تفكيرك لا معلوماتك. الأسئلة المتروكة تبقى فارغة في

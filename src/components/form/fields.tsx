@@ -41,7 +41,9 @@ export function FieldShell({
 }) {
   const Label = labelAs;
   return (
-    <div className={cn("group/field", className)}>
+    /* المجموعات (radio / chips / segmented) لا عنصر داخلها يحمل المعرّف —
+       نضعه على الغلاف حتى نستطيع التمرير إليه عند الإشارة إلى خطأ فيه. */
+    <div id={labelAs === "div" ? id : undefined} className={cn("group/field", className)}>
       <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Label
           htmlFor={labelAs === "label" ? id : undefined}

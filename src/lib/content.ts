@@ -507,5 +507,129 @@ export const SUCCESS_COPY = {
   line1: "شكرًا لأنك شاركتنا طريقة عملك، وليس فقط قائمة مهاراتك.",
   line2:
     "سنراجع ملفك بناءً على خبرتك، أعمالك، مجالاتك، وطريقة تفكيرك. وعندما يظهر مشروع يتقاطع مع ما تستطيع تقديمه، قد يتواصل معك فريق مُريح.",
+  thanks: "شكرًا لك على وقتك — ما كتبته هنا هو ما نقرأه فعلًا.",
+  followTitle: "تابع صفحات مُريح",
+  followBody:
+    "المشاريع والفرص الجديدة تُنشر على صفحاتنا قبل أي مكان آخر. تابعنا لتبقى قريبًا منها.",
+  followNote: "لا نرسل إزعاجًا — المتابعة تعني أنك ترى ما يناسبك متى ظهر.",
   cta: "العودة إلى مُريح",
+};
+
+/* ------------------------------------------------------------------ */
+/* صفحات مُريح — تُقرأ من البيئة حتى يستطيع الفريق تغييرها بلا كود      */
+/* ------------------------------------------------------------------ */
+
+export type SocialLink = {
+  key: "instagram" | "whatsapp";
+  label: string;
+  handle: string;
+  note: string;
+  href: string;
+};
+
+/**
+ * روابط المتابعة على شاشة النجاح.
+ * تُضبط عبر:
+ *   NEXT_PUBLIC_MUREEH_INSTAGRAM_URL
+ *   NEXT_PUBLIC_MUREEH_WHATSAPP_URL
+ * وإن لم تُضبط، تُخفى الكتلة بالكامل (لا نعرض روابط مكسورة أبدًا).
+ */
+export const SOCIAL_LINKS: SocialLink[] = [
+  {
+    key: "instagram",
+    label: "إنستقرام",
+    handle: "@mureeh",
+    note: "مشاريع وكواليس وفرص تظهر هنا أولًا",
+    href: (process.env.NEXT_PUBLIC_MUREEH_INSTAGRAM_URL ?? "").trim(),
+  },
+  {
+    key: "whatsapp",
+    label: "واتساب",
+    handle: "محادثة مباشرة",
+    note: "لتحديث بياناتك أو سؤال سريع",
+    href: (process.env.NEXT_PUBLIC_MUREEH_WHATSAPP_URL ?? "").trim(),
+  },
+];
+
+export const visibleSocialLinks = SOCIAL_LINKS.filter((link) => link.href.length > 0);
+
+/* ------------------------------------------------------------------ */
+/* رسائل الفشل — السبب + مكان السؤال، لا «حاول مرة أخرى» مبهمة          */
+/* ------------------------------------------------------------------ */
+
+export const SUBMIT_ERROR_COPY = {
+  title: "لم يُرسل الطلب",
+  fallback: "تعذّر إرسال الطلب. أعد المحاولة بعد قليل.",
+  network: "تعذّر الوصول إلى الشبكة. تأكد من الاتصال ثم أعد المحاولة.",
+  incomplete: "الطلب غير مكتمل بعد — بقيت حقول تحتاج تعديلًا في فصول سابقة.",
+  stepBlocked: "راجع الحقول المعلّمة في هذا الفصل قبل المتابعة.",
+  reason: "السبب",
+  location: "الموقع",
+  alsoNeeds: "يحتاج تعديلًا أيضًا",
+  jump: "خذني إلى مكان السؤال",
+  dataSafe: "بياناتك باقية في الصفحة ومحفوظة على جهازك — لن تفقد شيئًا.",
+};
+
+/**
+ * تسميات الحقول بلغة المستخدم — تُستخدم في رسائل الخطأ لتوجيهه إلى المكان،
+ * بدل إظهار اسم العمود (مثل problem_framing_answer).
+ */
+export const FIELD_LABELS: Record<string, string> = {
+  // 01 — الهوية والمجالات
+  full_name: "الاسم الكامل",
+  preferred_name: "الاسم الذي تفضّله",
+  email: "البريد الإلكتروني",
+  phone: "رقم التواصل",
+  country: "الدولة",
+  city: "المدينة",
+  services: "الخدمات التي تقدّمها فعلًا",
+  primary_specialty: "التخصص الأساسي",
+
+  // 02 — الخبرة
+  experience_level: "وصف مستواك",
+  years_experience: "سنوات الخبرة",
+  project_types_worked_on: "أنواع المشاريع التي عملت عليها",
+  portfolio_url: "رابط الأعمال",
+  linkedin_url: "رابط LinkedIn",
+  github_url: "رابط GitHub",
+  website_url: "الموقع الشخصي",
+
+  // 04 — العمل
+  project_1: "المشروع الأول",
+  project_1_problem: "المشروع الأول — المشكلة",
+  project_1_role: "المشروع الأول — دورك",
+  project_1_tools: "المشروع الأول — الأدوات",
+  project_1_result: "المشروع الأول — النتيجة",
+  project_2: "المشروع الثاني",
+  project_2_problem: "المشروع الثاني — المشكلة",
+  project_2_role: "المشروع الثاني — دورك",
+  project_2_tools: "المشروع الثاني — الأدوات",
+  project_2_result: "المشروع الثاني — النتيجة",
+  project_3: "المشروع الثالث",
+  project_3_problem: "المشروع الثالث — المشكلة",
+  project_3_role: "المشروع الثالث — دورك",
+  project_3_tools: "المشروع الثالث — الأدوات",
+  project_3_result: "المشروع الثالث — النتيجة",
+
+  // 05 — التوافق
+  ai_tools: "أدوات AI التي تستخدمها",
+  ai_experience: "مستوى استخدام AI",
+  ai_workflow: "كيف يدخل AI في عملك",
+  ai_boundaries: "ما ترفض أن يقرره AI عنك",
+  collaboration_type: "طريقة التعاون",
+  preferred_project_types: "أنواع المشاريع المفضّلة",
+  availability: "التوفر للبدء",
+  weekly_capacity: "السعة الأسبوعية",
+  pricing_model: "نموذج التسعير",
+  expected_project_range: "النطاق السعري المتوقع",
+  currency: "العملة",
+
+  // 06 — الإرسال
+  why_mureeh_answer: "لماذا مُريح؟",
+  understood_project_based_model: "إقرار: الطلب لا يعني التوظيف",
+  project_services_model: "إقرار: التعاون حسب المشاريع والخدمات",
+  compensation_is_service_based: "إقرار: المقابل مقابل الخدمة",
+  no_guaranteed_work: "إقرار: لا ضمان لمشروع",
+  agreed_to_contact: "إقرار: الموافقة على التواصل",
+  privacy_consent: "إقرار: استخدام البيانات للمراجعة",
 };
