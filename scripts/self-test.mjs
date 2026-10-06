@@ -126,6 +126,19 @@ test("عدد أعمدة الورقة مستقر (لا تغيير صامت)", () 
   }
 });
 
+test("حصة أسئلة التفكير معرّفة مرة واحدة ويفرضها المخطط", () => {
+  const m = SRC.content.match(/THINKING_MIN_ANSWERS\s*=\s*(\d+)/);
+  if (!m) throw new Error("THINKING_MIN_ANSWERS غير معرّف في content.ts");
+  const min = Number(m[1]);
+  if (min < 1 || min > 12) throw new Error(`حصة غير منطقية: ${min}`);
+  if (!SRC.schema.includes("thinkingQuotaMessage")) {
+    throw new Error("fullSchema لا يفرض حصة أسئلة التفكير (thinkingQuotaMessage)");
+  }
+  if (!SRC.schema.includes("optionalLongAnswer")) {
+    throw new Error("أسئلة التفكير يجب أن تبقى اختيارية لكل سؤال على حدة (optionalLongAnswer)");
+  }
+});
+
 /* ------------------------------- Runner ------------------------------ */
 
 let failed = 0;

@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { THINKING_QUESTIONS, ALL_SPECIALTIES } from "./content";
+import { THINKING_QUESTIONS, ALL_SPECIALTIES, THINKING_MIN_ANSWERS, thinkingQuotaMessage } from "./content";
 import { toAsciiDigits } from "./utils";
 
 /* ----------------------------- Helpers ----------------------------- */
@@ -43,6 +43,20 @@ const longAnswer = (min: number) =>
     .refine(
       (v) => v.length >= min,
       `خلّينا نفهم تفكيرك أكثر — اكتب على الأقل ${min} حرفًا (${min} حرف).`,
+    )
+    .refine((v) => v.length <= 4000, "خلّيها مركّزة: 4000 حرف كحدّ أقصى.");
+
+/**
+ * إجابة تفكير اختيارية: فارغة تمامًا = «تركْت السؤال»،
+ أو مكتوبة بشكل محترم (≥ الحد الأدنى) — لا نصف إجابات.
+ */
+const optionalLongAnswer = (min: number) =>
+  z
+    .string()
+    .transform(trim)
+    .refine(
+      (v) => v.length === 0 || v.length >= min,
+      `إن أردت إجابة هذا السؤال: اكتب ${min} حرفًا على الأقل — أو اتركه واختر سؤالًا غيره.`,
     )
     .refine((v) => v.length <= 4000, "خلّيها مركّزة: 4000 حرف كحدّ أقصى.");
 
@@ -130,27 +144,24 @@ export type ThinkingValues = Record<ThinkingColumn, string>;
 const minOf = (column: ThinkingColumn) =>
   THINKING_QUESTIONS.find((q) => q.column === column)?.minLength ?? 80;
 
-/** صيغة أسئلة التفكير — صريحة بالكامل ليبقى الاستنتاج (inference) سليمًا */
+/**
+ * صيغة أسئلة التفكير — الأسئلة الاثنا عشر موجودة كلها (أعمدة الـ Sheet لا تتغير)،
+ * لكن الإجابة على كل سؤال اختيارية؛ الحصة (4 على الأقل) يفرضها fullSchema أدناه.
+ */
 const thinkingShape = {
-  problem_framing_answer: longAnswer(minOf("problem_framing_answer")),
-  pre_work_question_answer: longAnswer(minOf("pre_work_question_answer")),
-  brief_ambiguity_answer: longAnswer(minOf("brief_ambiguity_answer")),
-  quality_vs_speed_answer: longAnswer(minOf("quality_vs_speed_answer")),
-  tool_vs_outcome_answer: longAnswer(minOf("tool_vs_outcome_answer")),
-  ai_philosophy_answer: longAnswer(minOf("ai_philosophy_answer")),
-  prompt_vs_understanding_answer: longAnswer(minOf("prompt_vs_understanding_answer")),
-  failure_definition_answer: longAnswer(minOf("failure_definition_answer")),
-  decision_making_answer: longAnswer(minOf("decision_making_answer")),
-  changed_belief_answer: longAnswer(minOf("changed_belief_answer")),
-  value_answer: longAnswer(minOf("value_answer")),
-  ownership_answer: longAnswer(minOf("ownership_answer")),
+  problem_framing_answer: optionalLongAnswer(minOf("problem_framing_answer")),
+  pre_work_question_answer: optionalLongAnswer(minOf("pre_work_question_answer")),
+  brief_ambiguity_answer: optionalLongAnswer(minOf("brief_ambiguity_answer")),
+  quality_vs_speed_answer: optionalLongAnswer(minOf("quality_vs_speed_answer")),
+  tool_vs_outcome_answer: optionalLongAnswer(minOf("tool_vs_outcome_answer")),
+  ai_philosophy_answer: optionalLongAnswer(minOf("ai_philosophy_answer")),
+  prompt_vs_understanding_answer: optionalLongAnswer(minOf("prompt_vs_understanding_answer")),
+  failure_definition_answer: optionalLongAnswer(minOf("failure_definition_answer")),
+  decision_making_answer: optionalLongAnswer(minOf("decision_making_answer")),
+  changed_belief_answer: optionalLongAnswer(minOf("changed_belief_answer")),
+  value_answer: optionalLongAnswer(minOf("value_answer")),
+  ownership_answer: optionalLongAnswer(minOf("ownership_answer")),
 };
-const thinkingAt = (from: number, to: number) =>
-  z.object(
-    Object.fromEntries(
-      THINKING_QUESTIONS.slice(from, to).map((q) => [q.column, longAnswer(q.minLength)]),
-    ) as Record<string, ReturnType<typeof longAnswer>>,
-  );
 
 /* --------------------------- 05 — Work ------------------------------ */
 
@@ -280,22 +291,29 @@ const agreement = z.object({
   privacy_consent: ack("نحتاج موافقتك على استخدام بياناتك لغرض مراجعة الطلب والتواصل."),
 });
 
-/* ------------------------ Step registry (Pages) --------------------- */
+/* ---------------------- Step registry (6 فصول) ---------------------- */
+
+/**
+ * ستة فصول بدل 13 صفحة: دمَجنا الحقول المتقاربة في فصل واحد متماسك،
+ * وعقد البيانات (66 عمودًا في Google Sheet) لم يتغيّر إطلاقًا.
+ */
+const profile = z.object({ ...identity.shape, ...craft.shape });
+const thinkingChapter = z.object(thinkingShape);
+const match = z.object({
+  ...ai.shape,
+  ...collaboration.shape,
+  ...availability.shape,
+  ...pricing.shape,
+});
+const closing = z.object({ ...why.shape, ...agreement.shape });
 
 export const stepSchemas = {
-  identity,
-  craft,
+  profile,
   experience,
-  "thinking-a": thinkingAt(0, 4),
-  "thinking-b": thinkingAt(4, 8),
-  "thinking-c": thinkingAt(8, 12),
+  thinking: thinkingChapter,
   work,
-  ai,
-  collaboration,
-  availability,
-  pricing,
-  why,
-  agreement,
+  match,
+  closing,
 } as const;
 
 export type StepId = keyof typeof stepSchemas;
@@ -339,6 +357,21 @@ export const fullSchema = z
         message: "التخصص الأساسي يجب أن يكون واحدًا من الخدمات التي اخترتها.",
         path: ["primary_specialty"],
       });
+    }
+    /* حصة أسئلة التفكير: 4 إجابات على الأقل — الخطأ يُوضع على أول سؤال غير مُجاب */
+    const thinkingValues = values as unknown as Record<string, string>;
+    const answered = THINKING_QUESTIONS.filter(
+      (q) => thinkingValues[q.column].trim().length > 0,
+    ).length;
+    if (answered < THINKING_MIN_ANSWERS) {
+      const target = THINKING_QUESTIONS.find((q) => thinkingValues[q.column].trim().length === 0);
+      if (target) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: thinkingQuotaMessage(THINKING_MIN_ANSWERS),
+          path: [target.column],
+        });
+      }
     }
   });
 
