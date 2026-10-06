@@ -538,7 +538,7 @@ export const SOCIAL_LINKS: SocialLink[] = [
   {
     key: "instagram",
     label: "إنستقرام",
-    handle: "@mureeh",
+    handle: "@mureeh.tech",
     note: "مشاريع وكواليس وفرص تظهر هنا أولًا",
     href: (process.env.NEXT_PUBLIC_MUREEH_INSTAGRAM_URL ?? "").trim(),
   },

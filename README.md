@@ -170,8 +170,8 @@ curl http://localhost:3000/api/health
 الروابط تُقرأ من البيئة:
 
 ```bash
-NEXT_PUBLIC_MUREEH_INSTAGRAM_URL="https://www.instagram.com/..."
-NEXT_PUBLIC_MUREEH_WHATSAPP_URL="https://wa.me/9705xxxxxxx"
+NEXT_PUBLIC_MUREEH_INSTAGRAM_URL="https://www.instagram.com/mureeh.tech"
+NEXT_PUBLIC_MUREEH_WHATSAPP_URL="https://wa.me/message/BTUNS4DLIKBLI1"
 ```
 
 وإن تُركت فارغة تُخفى الكتلة بالكامل — لا نعرض روابط فارغة أبدًا.
